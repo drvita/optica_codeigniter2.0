@@ -1,0 +1,900 @@
+var $testime,$catid=new Object(),$testjson=new Object(),$pedidosjson=new Object(),$b;
+$(function(){
+	var lastsel2=0;
+	$catid = $.parseJSON($('#catid').val());
+	$("#gridcaja").jqGrid({
+		datatype:"local",
+		height: 150,
+		colNames:['id','Und','Producto','Precio'], 
+		colModel:[ 
+			{name:'id',index:'id',width:20,sorttype:"integer",hidden:true},
+			{name:'und',index:'und',width:20,sorttype:"integer",editable:true},
+			{name:'item',index:'item',width:0,sorttype:"string",editable:true},
+			{name:'price',index:'price',width:40,sorttuype:"float",formatter:"float",align:"right",
+				formatoptions:{thousandsSeparator:" ",defaultValue:'0',decimalPlaces:2},editable:true}
+		],
+		footerrow: true,
+		userDataOnFooter: true,
+		pager:'',
+        ondblClickRow:function(rowid){
+			$(this).jqGrid('restoreRow',lastsel2);
+			$(this).jqGrid('delRowData',rowid);
+		},
+        onSelectRow: function(rowid){
+			editparameters = {
+				"keys" : true,
+				"oneditfunc" : null,
+				"successfunc" : null,
+				"url" : base_url,
+				"extraparam" : {
+					csrf_omadero:$.cookie('csrf_omadero')
+				},
+				"aftersavefunc" : function(){
+					var fullData = $('#gridcaja').jqGrid('getRowData');
+					for(i in fullData){
+						if(typeof fullData[i]!='object') continue;
+						if(fullData[i].id==null || fullData[i].id==0){
+							fullData.remove(i);
+							fullData.clean();
+						}
+					}
+					$('#items').val(JSON.stringify(fullData));
+					$('#gridcaja').trigger('reloadGrid');
+				},
+				"errorfunc": function(e){console.log(e)},
+				"afterrestorefunc" : null,
+				"restoreAfterError" : function(e){console.log(e)},
+				"mtype" : "POST"
+			}
+			$(this).jqGrid('editRow',rowid,editparameters);
+			
+        },
+        loadComplete: function(data){
+			$(this).jqGrid('clearGridData');
+			var server=$('#idserver').val(),
+				itemstext = $('#items').val(),
+				items=$.parseJSON(itemstext),
+				fullData,title,itemstext,items;
+			if(items.length && server!='0'){
+				title = {
+					id:0,
+					und:'',
+					item:'Nota n. '+server,
+					price:0
+				};
+				$("#gridcaja").jqGrid('addRowData',0,title);
+			}
+			for(i in items){
+				if(typeof items[i]!='object') continue;
+				if(items[i].price==null) items[i].price=0;
+				else items[i].price=parseFloat(items[i].price);
+				$("#gridcaja").jqGrid('addRowData',i,items[i]);
+			}
+			fullData = $(this).jqGrid('getRowData')
+			for(i in fullData){
+				if(typeof fullData[i]!='object') continue;
+				if(fullData[i].id==null || fullData[i].id==0){
+					fullData.remove(i);
+					fullData.clean();
+				}
+			}
+			$('#items').val(JSON.stringify(fullData));
+		},
+		gridComplete: function(){
+			var parseTotal=  $(this).jqGrid('getCol', 'price', false, 'sum');
+            $(this).jqGrid('footerData','set',{item:'TOTAL',price:parseTotal});
+            $("#code").val('');
+            $('#venta_total').val(parseTotal);
+        }
+	});
+	$("#gridcaja").jqGrid('setGridWidth', $("#panel-caja").width()-10, true);
+	$('#remove-client').click(function(){
+		setClient(0,'');
+	});
+	$('#goexamen').click(function(){
+		var idclient = $('#idclient').val();
+		confirm('Confirme que anexa nuevo examen',[
+			{
+				addClass: 'btn btn-default', 
+				text: 'Cancelar', 
+				onClick: function($noty){
+					$noty.close();
+				}
+			},
+			{
+				addClass: 'btn btn-success', 
+				text: 'Confirmar', 
+				onClick: function($noty){
+					$noty.close();
+					$.post(base_url + "optica/saveExamenes",{
+						oper:"add",
+						idclient:idclient,
+						status:0,
+						csrf_omadero:$.cookie('csrf_omadero')
+					}).done(function(data){
+						if(data.result) load_test();
+						$.noty.closeAll();
+						showMessageSys();
+					});
+				}
+			}
+		]);
+	});
+	$('#makeServer').click(function(){
+		addServicio(0,$('#idclient').val());
+	});
+	$('#adp').click(function(){
+		adp($('#idclient').val());
+	});
+	$( "#dialog-form-pedido" ).dialog({
+		autoOpen: false,
+		modal: true,
+		width: 890,
+		position: 'top',
+		buttons:[
+			{
+				html:"<span class='glyphicon glyphicon-ban-circle'></span> Cerrar",
+                class:"btn btn-default",
+                click:function () {
+					$(this).dialog( "close" );
+                }
+            },
+            {
+				html:"<span class='glyphicon glyphicon-floppy-disk'></span> Enviar & imprimir",
+				class:"btn btn-success",
+                click:function(b){
+					$b=b;
+					confirm('Confirme que desea <strong>ENVIAR</strong> el pedido',[{
+						addClass: 'btn btn-default', 
+						text: 'Cancelar', 
+						onClick: function($noty) {
+							$noty.close();
+						}
+					},
+					{
+						addClass: 'btn btn-success', 
+						text: 'Confirmar', 
+						onClick: function($noty){
+							$noty.close();
+							$(b.target).text('Enviando ...');
+							$.post($(document.formpedidos).attr("action"),
+								$(document.formpedidos).serialize()
+							).done(function(data){
+								if(typeof data.result != 'undefined'){
+									$('#idserver').val(data.result.pedido);
+									$('#formservices').attr('action',base_url+'report/print_nota_pdf');
+									$('#formservices').attr('target','_black');
+									$('#formservices').submit();
+									$('#formservices').attr('target','_self');
+									$('#formservices').attr('action','');
+									setClient(0,'');
+								}
+								load_test();
+								$('#dialog-form-pedido').dialog( "close" );
+							}).fail(function(){
+								showMessageSys();
+								$(b.target).html("<span class='glyphicon glyphicon-floppy-disk'></span> Enviar & imprimir");
+							});
+						}
+					}
+					]);
+                }
+			}
+		],
+		open: function(){
+			$.noty.closeAll();
+			clearTimeout($timeout);
+			clearTimeout($testime);
+		},
+		close: function(){
+			if(typeof $b != 'undefined') 
+				$($b.target).html("<span class='glyphicon glyphicon-floppy-disk'></span> Guardar & imprimir");
+			document.formpedidos.reset();
+			$('#txoptico_ma').parent().addClass("hide");
+			$('#txoptico_ma option').remove();
+			$('#txoptico').parent().addClass("hide");
+			$('#txoptico option').remove();
+			$.noty.closeAll();
+			showMessageSys();
+		}
+	});
+	$( "#dialog-form-status" ).dialog({
+		autoOpen: false,
+		modal: true,
+		width: 890,
+		position: 'top',
+		buttons:[
+			{
+				html:"<span class='glyphicon glyphicon-ban-circle'></span> Cerrar",
+                class:"btn btn-default",
+                click:function () {
+					$(this).dialog( "close" );
+                }
+            },
+            {
+				html:"<span class='glyphicon glyphicon-floppy-disk'></span> Actualizar",
+				class:"btn btn-success",
+                click:function(b){
+					$b=b;
+					confirm('Confirme que desea <strong>ACTUALIZAR</strong> el pedido',[{
+						addClass: 'btn btn-default', 
+						text: 'Cancelar', 
+						onClick: function($noty) {
+							$noty.close();
+						}
+					},
+					{
+						addClass: 'btn btn-success', 
+						text: 'Confirmar', 
+						onClick: function($noty){
+							$noty.close();
+							$(b.target).text('Enviando ...');
+							$.post($(document.formstatus).attr("action"),
+								$(document.formstatus).serialize()
+							).done(function(data){
+								load_test();
+								$('#dialog-form-status').dialog( "close" );
+							}).fail(function(){
+								showMessageSys();
+								$(b.target).html("<span class='glyphicon glyphicon-floppy-disk'></span> Actualizar");
+							});
+						}
+					}
+					]);
+                }
+			}
+		],
+		open: function(){
+			$.noty.closeAll();
+			clearTimeout($timeout);
+			clearTimeout($testime);
+		},
+		close: function(){
+			if(typeof $b != 'undefined') 
+				$($b.target).html("<span class='glyphicon glyphicon-floppy-disk'></span> Actualizar");
+			$('#gridcaja').trigger('reloadGrid');
+			document.formstatus.reset();
+			$('#txoptico_ma').parent().addClass("hide");
+			$('#txoptico_ma option').remove();
+			$('#txoptico').parent().addClass("hide");
+			$('#txoptico option').remove();
+			$.noty.closeAll();
+			showMessageSys();
+		}
+	});
+	$( "#dialog-form-adp" ).dialog({
+		autoOpen: false,
+		modal: true,
+		width: 890,
+		position: 'top',
+		buttons:[
+			{
+				html:"<span class='glyphicon glyphicon-ban-circle'></span> Cerrar",
+                class:"btn btn-default",
+                click:function () {
+					$(this).dialog( "close" );
+                }
+            },
+            {
+				html:"<span class='glyphicon glyphicon-floppy-disk'></span> Enviar",
+				class:"btn btn-success",
+                click:function(b){
+					$b=b;
+					confirm('Confirme que desea <strong>ENVIAR</strong> el ADP',[{
+						addClass: 'btn btn-default', 
+						text: 'Cancelar', 
+						onClick: function($noty) {
+							$noty.close();
+						}
+					},
+					{
+						addClass: 'btn btn-success', 
+						text: 'Confirmar', 
+						onClick: function($noty){
+							$noty.close();
+							$(b.target).text('Enviando ...');
+							$.post($('#formadp').attr("action"),
+								$('#formadp').serialize()
+							).done(function(data){
+								$('#dialog-form-adp').dialog( "close" );
+							}).fail(function(){
+								showMessageSys();
+								$(b.target).html("<span class='glyphicon glyphicon-floppy-disk'></span> Enviar & imprimir");
+							});
+						}
+					}
+					]);
+                }
+			}
+		],
+		open: function(){
+			$.noty.closeAll();
+			clearTimeout($timeout);
+			clearTimeout($testime);
+		},
+		close: function(){
+			if(typeof $b != 'undefined') 
+				$($b.target).html("<span class='glyphicon glyphicon-floppy-disk'></span> Guardar");
+			document.formadp.reset();
+			$.noty.closeAll();
+			showMessageSys();
+		}
+	});
+	$("#fentrega").datepicker({
+		dateFormat: "yy-mm-dd"
+	});
+	$("#cliente").autocomplete({
+		source: function(request,response){
+			$.post(base_url + 'catalogos/jsonContacSearch',{
+				rfc:request.term,
+				csrf_omadero:$.cookie('csrf_omadero')
+			}).done(function(data){
+				var row = new Array();
+				for (var p in data){
+					if(isNaN(p)) break;
+					row[p] = new Object();
+					row[p].label = data[p].row.name;
+					row[p].value = data[p].row.name;
+					row[p].row = data[p].row;
+				}
+				response( row );
+			});
+		},
+		minLength: 3,
+		select: function( event, ui ){
+			setClient(ui.item.row.id,ui.item.row.name);
+		}
+	});
+	//Codigo de productos
+	$( "#code" ).autocomplete({
+		source: function(request,response){
+			var term = request.term.split(' '),mpago;
+			pagar_monto();
+			if(term.length==1){
+				$.post(base_url + 'catalogos/jsonStoreItemSearch',{
+					word:request.term,
+					csrf_omadero:$.cookie('csrf_omadero')
+				}).done(function(data){
+					response(data);
+				});
+			} else if(term.length>1 && term[0]=='caja' && term[0].length){
+				$.post(base_url + 'store/jsonPedidos',{
+					_search:'true',
+					searchField:['ncaja','idcliente','status'],
+					searchOper:['eq','eq','ge'],
+					searchString:[term[1],$("#idclient").val(),3],
+					searchCont:['AND','AND'],
+					sidx:'date',
+					csrf_omadero:$.cookie('csrf_omadero')
+				}).done(function(data){
+					var row = new Array();
+					if(data.records){
+						for (var p in data.rows){
+							if(isNaN(p)) break;
+							row[p] = new Object();
+							row[p].label = data.rows[p].cell.date+'-['+data.rows[p].cell.total+'] '+data.rows[p].cell.statusname;
+							row[p].value = '';
+							row[p].row = data.rows[p].cell;
+						}
+					} else {
+						row[0] = new Object();
+						row[0].label = 'Caja '+ data.searchString+' no tiene referencia con este cliente';
+						row[0].value = '';
+						row[0].row = {};
+					}
+					response( row );
+				});
+			}
+		},
+		minLength:4,
+		select: function(event,ui){
+			if(typeof ui.item.row != 'undefined'){
+				if(typeof ui.item.row.items != 'undefined'){
+					$('#idserver').val(ui.item.row.id);
+					if(ui.item.row.items.length){
+						$('#items').val(ui.item.row.items);
+						$('#gridcaja').trigger('reloadGrid');
+					}
+				}
+				if(typeof ui.item.row.code != 'undefined'){
+					items=$.parseJSON($('#items').val());
+					items[items.length]={
+						id:ui.item.row.id,
+						und:1,
+						item:ui.item.row.name,
+						price:ui.item.row.price
+					}
+					$('#items').val(JSON.stringify(items));
+					$('#gridcaja').trigger('reloadGrid');
+				}
+			}
+			$( "#code" ).val('');
+			return false;
+		}
+	});
+	//Codigo de productos en pedidos
+	$( "#armazon_name" ).autocomplete({
+		source: function(request,response){
+			$.post(base_url + 'catalogos/jsonStoreItemSearch',{
+				word:request.term,
+				csrf_omadero:$.cookie('csrf_omadero')
+			}).done(function(data){
+				response( data );
+			});
+		},
+		minLength: 3,
+		select: function( event,ui ){
+			if(typeof ui.item.row != 'undefined'){
+				var price = parseFloat(ui.item.row.price);
+				if(price) $('#armazon').val(price.toFixed(2));
+				else $('#armazon').val(0);
+				$('#armazon_code').val(ui.item.row.code);
+				subtotal();
+				total();
+			}
+		}
+	});
+	$('#txoptico_tl').change(function(){
+		var count;
+		$('#txoptico_ma').parent().removeClass("hide");
+		$('#txoptico_ma option').remove();
+		$('#txoptico').parent().removeClass("hide");
+		$('#txoptico option').remove();
+		if(typeof $catid[$(this).val()] != "undefined"){
+			count = Object.keys($catid[$(this).val()]);
+			if(count.length){
+				for(i in count){
+					if(typeof count[i] == 'string')
+						$('#txoptico_ma')
+						.append($('<option>', { value : count[i] })
+						.text(count[i])); 
+				}
+				$('#txoptico_ma').change();
+			} else {
+				$('#txoptico_ma').parent().addClass("hide");
+				$('#txoptico_ma option').remove();
+				$('#txoptico').parent().addClass("hide");
+				$('#txoptico option').remove();
+				$('#lente').val(0);
+				$('#consulta').val(250);
+				subtotal();
+				total();
+				msg('No hay categorias, para este tipo de lente','warning');
+			}
+		} else {
+			$('#txoptico_ma').parent().addClass("hide");
+			$('#txoptico_ma option').remove();
+			$('#txoptico').parent().addClass("hide");
+			$('#txoptico option').remove();
+			$('#lente').val(0);
+			$('#consulta').val(250);
+			subtotal();
+			total();
+			msg('Error en el tipo de lente','error');
+		}
+	});
+	$('#txoptico_ma').change(function(){
+		var count;
+		$('#txoptico').parent().removeClass("hide");
+		$('#txoptico option').remove();
+		if(typeof $catid[$('#txoptico_tl').val()][$(this).val()] != "undefined"){
+			count = Object.keys($catid[$('#txoptico_tl').val()][$(this).val()]);
+			if(count.length){
+				for(i in count){
+					if(typeof count[i] == 'string')
+						$('#txoptico')
+						.append($('<option>', { value : count[i] })
+						.text(count[i])); 
+				}
+				valor_lente();
+			} else {
+				$('#txoptico option').remove();
+				$('#lente').val(0);
+				$('#consulta').val(250);
+				subtotal();
+				total();
+				msg('No hay categorias definidas para este material','warning');
+			}
+		} else {
+			$('#txoptico option').remove();
+			$('#lente').val(0);
+			$('#consulta').val(250);
+			subtotal();
+			total();
+			msg('Error en los materiales del lentes','error');
+		}
+	});
+	$('#txoptico').change(function(){
+		valor_lente();
+		subtotal();
+		total();
+	});
+	$( "#consulta,#armazon,#lente" ).change(function(){
+		subtotal();
+		total();
+	});
+	$( "#subtotal,#anticipo,#descuento" ).change(function(){
+		total();
+	});
+	$('#p_metodopago').change(function(){
+		var val = $(this).val(), detalles=new Object();
+		detalles.banco='';
+		detalles.digitos=0; 
+		detalles.promo=12;
+		if(val=='TARJETA DE CREDITO' || val=='TARJETA DE DEBITO' || val=='CHEQUE'){
+			detalles.banco = prompt("Banco", "");
+			detalles.digitos = prompt("Ultimos 4 digitos", "");
+			if(val=='TARJETA DE CREDITO'){
+				detalles.promo = prompt("Meses sin intereses (numero de meses)",detalles.promo);
+				detalles.promo = parseInt(detalles.promo);
+			}
+			detalles.banco = detalles.banco.toUpperCase();
+			detalles.digitos = parseInt(detalles.digitos);
+			$('#detalles_banco').val(JSON.stringify(detalles));
+		} else $('#detalles_banco').val('{}');
+	});
+	load_test();
+	$('#code').focus();
+	$('#c_pagar').click(function(){
+		pagar_monto();
+	});
+});
+function load_test(){
+	$("#list-examenes").empty();
+	$("#list-pedidos").empty();
+	$.post(base_url + "optica/jsonExamenes",{
+		csrf_omadero:$.cookie('csrf_omadero'),
+		_search:'true',
+		searchField:'status',
+		searchString:2,
+		searchOper:'lt'
+	}).done(function(result){
+		$testjson = result;
+		if(parseInt(result.records)){
+			for(i in result.rows){
+				if(typeof result.rows[i] != 'object') continue;
+				var status = " disabled",
+					data = result.rows[i].cell,
+					st = parseInt(data.status),
+					cnt = parseInt(data.contacto.length),
+					onclick = "", name = "";
+				if(st){
+					status = " list-group-item-success";
+					onclick = 'onclick="addServicio('+result.rows[i].id+','+data.idclient+')"';
+				} else {
+					onclick = 'onclick="delServicio('+result.rows[i].id+','+data.idclient+')"';
+				}
+				if(cnt>21) name = data.contacto.substring(0,20)+'...';
+				else name = data.contacto;
+				$("#list-examenes").append(
+					'<a href="javascript:void(0)"'+onclick+'class="list-group-item'+status+'">'+
+					name +'</a>'
+				);
+			}
+		} else
+			$("#list-examenes").html('<a href="javascript:void(0)" class="list-group-item list-group-item-warning">No hay pendientes</a>');
+	});
+	//Pedidos
+	$.post(base_url + "store/jsonPedidos",{
+		csrf_omadero:$.cookie('csrf_omadero'),
+		_search:'true',
+		searchField:'status',
+		searchString:3,
+		searchOper:'le',
+		sidx:'status',
+		sord:'desc'
+	}).done(function(result){
+		$pedidosjson = result;
+		if(result.records){
+			$(result.rows).each(function(i,field){
+				var status = " disabled",
+					st = parseInt(field.cell.status),
+					cnt = parseInt(field.cell.contacto.length),
+					onclick="";
+				if(st)
+					onclick = 'onclick="openServices('+field.id+')"';
+				if(st==1) status = " list-group-item-info";
+				if(st==2) status = " list-group-item-warning";
+				if(st==3) status = " list-group-item-success";
+				if(cnt>15) field.cell.contacto = field.cell.contacto.substring(0,16);
+				$("#list-pedidos").append('<a href="javascript:void(0)"'+onclick+'class="list-group-item'+status+'">'+ field.cell.ncaja.pad('0',3) +'-'+ field.cell.contacto +'</a>');
+			});
+		} else 
+			$("#list-pedidos").html('<a href="javascript:void(0)"class="list-group-item list-group-item-warning">No hay pendientes</a>');
+	});
+	if($testime) clearTimeout($testime);
+	$testime = setTimeout(function(){load_test()},60000);
+}
+function addServicio(id,idclient){
+	var telefonos='',key,data=new Object();
+	$('#txoptico_ma').parent().addClass("hide");
+	$('#txoptico_ma option').remove();
+	$('#txoptico').parent().addClass("hide");
+	$('#txoptico option').remove();
+	if(id>0 && $testjson.records>0){
+		for(i in $testjson.rows){
+			if($testjson.rows[i].id == id){
+				data = $testjson.rows[i].cell
+				break;
+			}
+		}
+		$('#consulta').val(300);
+		if(typeof data.telnumber.mobil == 'undefined') data.telnumber = $.parseJSON(data.telnumber);
+		if(typeof data.txoptico.tipo == 'undefined') data.txoptico = $.parseJSON(data.txoptico);
+		$('#nombrecliente').text(data.contacto);
+		setClient(idclient,data.contacto);
+		for(var i in data.telnumber){
+			if(data.telnumber[i].length)
+				telefonos += "<u>"+i+"</u>: "+data.telnumber[i]+"<br/>";
+		}
+		if(!telefonos.length) telefonos="<input name='contact[telnumber][mobil]'class='form-control input-md'/>";
+		if(data.txoptico.tipo!=0){
+			$('#txoptico_tl').val(data.txoptico.tipo);
+			$('#txoptico_tl').change();
+			setTimeout(function(){
+				$('#txoptico_ma').val(data.txoptico.material);
+				$('#txoptico_ma').change();
+			},300);
+			setTimeout(function(){
+				$('#txoptico').val(data.txoptico.tx);
+			},600);
+		}
+		$('#telefonos').html(telefonos);
+		$('#esferaoi').html('<small>'+data.esferaoi+'</small>');
+		$('#esferaod').html('<small>'+data.esferaod+'</small>');
+		$('#cilindroi').html('<small>'+data.cilindroi+'</small>');
+		$('#cilindrod').html('<small>'+data.cilindrod+'</small>');
+		$('#ejeoi').html('<small>'+data.ejeoi+'</small>');
+		$('#ejeod').html('<small>'+data.ejeod+'</small>');
+		$('#adicioni').html('<small>'+data.adicioni+'</small>');
+		$('#adiciond').html('<small>'+data.adiciond+'</small>');
+		$('#dpoi').html('<small>'+data.dpoi+'</small>');
+		$('#dpod').html('<small>'+data.dpod+'</small>');
+	} else {
+		$('#consulta').val(0);
+		$('#nombrecliente').text($('#cliente').val());
+	}
+	$('#idcliente').val(idclient);
+	$('#test_id').val(id);
+	$('#dialog-form-pedido').removeClass('hide');
+	$('#dialog-form-pedido').dialog('open');
+}
+function delServicio(id,idclient){
+	if(id>0 && $testjson.records>0){
+		for(i in $testjson.rows){
+			if($testjson.rows[i].id == id){
+				data = $testjson.rows[i].cell
+				break;
+			}
+		}
+		confirm('Desea <strong>eliminar</strong> el examen de '+data.contacto,[{
+			addClass: 'btn btn-default', 
+			text: 'Cancelar', 
+			onClick: function($noty) {
+				$noty.close();
+			}
+		},
+		{
+			addClass: 'btn btn-success', 
+			text: 'Confirmar', 
+			onClick: function($noty){
+				$noty.close();
+				$.post(base_url + "optica/saveExamenes",{
+					oper:"del",
+					id:id,
+					csrf_omadero:$.cookie('csrf_omadero')
+				}).done(function(data){
+					if(data.result) load_test();
+					$.noty.closeAll();
+					$('#code').focus();
+					showMessageSys();
+				});
+			}
+		}]);
+	}
+}
+function openServices(id){
+	var telefonos='',data,items;
+	if(id>0 && $pedidosjson.records>0){
+		data=new Object();
+		for(i in $pedidosjson.rows){
+			if($pedidosjson.rows[i].id == id){
+				data = $pedidosjson.rows[i].cell
+				break;
+			}
+		}
+		if(typeof data.status == 'undefined') return false;
+		setClient(data.idcliente,data.contacto);
+		$('#idserver').val(data.id);
+		$('#idtest').val(data.test);
+		if(data.status=='3'){
+			items=$.parseJSON(data.items);
+			if(data.descuento>0){
+				items[items.length]={
+					id:100000,
+					und:'',
+					item:'Descuento',
+					price:data.descuento*-1
+				}
+			}
+			if(data.anticipo>0){
+				items[items.length]={
+					id:100001,
+					und:'',
+					item:'Anticipo',
+					price:data.anticipo*-1
+				}
+			}
+			$('#items').val(JSON.stringify(items));
+			$('#gridcaja').trigger('reloadGrid');
+			return false;
+		} else {
+			$('#items').val('{}');
+			$('#gridcaja').trigger('reloadGrid');
+		}
+		if(typeof data.telnumber.mobil === 'undefined' && typeof data.telnumber === 'string'){
+			data.telnumber = $.parseJSON(data.telnumber);
+		}
+		for(var i in data.telnumber){
+			if(data.telnumber[i].length)
+				telefonos += "<u>"+i+"</u>: "+data.telnumber[i]+"<br/>";
+		}
+		if(!telefonos.length) telefonos="<input name='contact[telnumber][mobil]'class='form-control input-md'/>";
+		$('#status_contacto').text(data.contacto);
+		$('#status_telefonos').html(telefonos);
+		$('#nota').text(data.id);
+		$('#lab').text(data.laboratorio);
+		$('#foliolab').text(data.npedidolab);
+		if(data.ncaja!=0){
+			$('#ncaja').prop('readonly',true);
+			$('#ncaja').val(data.ncaja);
+		} else {
+			$('#ncaja').prop('readonly',false);
+			$('#ncaja').val('');
+		}
+		$('#statusname').val(data.status);
+		if(data.mensajes.length) $('#mensaje').text(data.mensajes); else $('#mensaje').text('Sin mensajes');
+		$('#idpedido').val(id);
+		$('#dialog-form-status').removeClass('hide');
+		$('#dialog-form-status').dialog('open');
+	} else setClient(0,'');
+}
+function valor_lente(){
+	if($('#txoptico_tl').val()!=0){
+		if(typeof $catid[$('#txoptico_tl').val()][$('#txoptico_ma').val()][$('#txoptico').val()] != "undefined"){
+			$('#lente').val($catid[$('#txoptico_tl').val()][$('#txoptico_ma').val()][$('#txoptico').val()].precio);
+			$('#consulta').val(0);
+		} else {
+			$('#lente').val(0);
+			$('#consulta').val(250);
+		}
+	} else {
+		$("#consulta").val(0);
+		$("#armazon").val(0);
+		$("#lente").val(0);
+	}
+	subtotal();
+	total();
+}
+function subtotal(){
+	var consulta = $("#consulta").val(),
+		armazon = $("#armazon").val(),
+		lente = $("#lente").val(),
+		suma=0;
+	suma = parseFloat(consulta)+parseFloat(armazon)+parseFloat(lente);
+	$("#subtotal").val(suma.toFixed(2));
+}
+function total(){
+	var subtotal = $("#subtotal").val(),
+		descuento = $("#descuento").val(),
+		anticipo = $("#anticipo").val(),
+		suma=0;
+	suma = parseFloat(subtotal)-(parseFloat(anticipo)+parseFloat(descuento));
+	$("#total").val(suma.toFixed(2));
+}
+function setClient(id,name){
+	document.formservices.reset();
+	if(id > 999){
+		$('#cliente').prop('disabled',true);
+		if(id > 1000) $('#client-button > button').prop('disabled',false);
+		$('#cliente').val(name);
+		$('#idclient').val(id);
+		$('#gridcaja').jqGrid('clearGridData');
+		$('#code').prop('disabled',false);
+		$('#code').focus();
+	} else {
+		confirm('Quiere <strong>CERRAR</strong> la sesión de '+$('#cliente').val(),[{
+			addClass: 'btn btn-default', 
+			text: 'Cancelar', 
+			onClick: function($noty) {
+				$noty.close();
+			}
+		},
+		{
+			addClass: 'btn btn-success', 
+			text: 'Confirmar', 
+			onClick: function($noty){
+				$('#cliente').val('');
+				$('#idclient').val(0);
+				$('#gridcaja').jqGrid('clearGridData');
+				$('#cliente').prop('disabled',false);
+				$('#client-button > button').prop('disabled',true);
+				$('#code').prop('disabled',true);
+				$('#cliente').focus();
+				$noty.close();
+			}
+		}]);
+	}
+	$('#idserver').val(0);
+}
+function adp(idclient){
+	$.post(base_url+'store/jsonPedidos',{
+		_search:'true',
+		searchField:['idcliente','status'],
+		searchOper:['eq','le'],
+		searchString:[idclient,3],
+		searchCont:['AND'],
+		sidx:'date',
+		csrf_omadero:$.cookie('csrf_omadero')
+	}).done(function(data){
+		if(data.records){
+			$('#adp_id_test option').remove();
+			for(i in data.rows){
+				if(typeof data.rows[i] != 'object') continue;
+				$('#adp_id_test')
+					.append($('<option>', { value : data.rows[i].cell.test })
+					.text(data.rows[i].cell.id)); 
+			}
+		}
+	});
+	$('#dialog-form-adp').removeClass('hide');
+	$('#dialog-form-adp').dialog('open');
+}
+function pagar_monto(){
+	var count=0,val = $('#c_metododepago').val(), detalles=new Object();
+	if(term.length==1 && term[0].toLowerCase()=='total'){
+		count = $("#gridcaja").getGridParam("reccount");
+		if(count){
+			confirm('¿Quiere <strong>terminar</strong> la venta?',[{
+				addClass: 'btn btn-default', 
+				text: 'Cancelar', 
+				onClick: function($noty) {
+					$noty.close();
+				}
+			},
+			{
+				addClass: 'btn btn-success', 
+				text: 'Confirmar', 
+				onClick: function($noty){
+					$noty.close();
+					detalles.banco='';
+					detalles.digitos=0; 
+					detalles.promo=12;
+					if(val=='TARJETA DE CREDITO' || val=='TARJETA DE DEBITO' || val=='CHEQUE'){
+						detalles.banco = prompt("Banco", "");
+						detalles.digitos = prompt("Ultimos 4 digitos", "");
+						if(val=='TARJETA DE CREDITO'){
+							detalles.promo = prompt("Meses sin intereses (numero de meses)",detalles.promo);
+							detalles.promo = parseInt(detalles.promo);
+						}
+						detalles.banco = detalles.banco.toUpperCase();
+						detalles.digitos = parseInt(detalles.digitos);
+						$('#c_banco').val(JSON.stringify(detalles));
+					} else $('#c_banco').val('{}');
+					$.post(base_url + 'inbox/saveventa',
+						$('#formservices').serialize()
+					).done(function(data){
+						if(data.result){
+							$("#gridcaja").jqGrid('clearGridData');
+							setClient(0,'');
+							showMessageSys();
+							load_test();
+						}
+					});
+				}
+			}]);
+		} else msg('No hay <strong>items</strong> a cobrar','warning');
+		$( "#code" ).val('');
+		response();
+	}
+})

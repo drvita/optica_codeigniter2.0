@@ -1,0 +1,3 @@
+div#dialog-form-new div#formNew-res {min-height:20px;visibility:hidden;padding:5px;margin-bottom:5px;}
+div#dialog-form-new input{text-transform:uppercase;}
+div#dialog-form-new input[type='email']{text-transform:lowercase;}

@@ -1,0 +1,5 @@
+div#list-pedidos{
+    max-height:420px;
+    min-height:220px;
+    overflow-y:scroll; 
+}

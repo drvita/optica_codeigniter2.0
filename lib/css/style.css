@@ -1,0 +1,133 @@
+/*HTML TAG*/
+body,html{height:100%;}
+body {overflow:hidden;}
+section#sectionContent {padding:19px 32px 35px 16px;}
+.modal {
+    display:    none;
+    position:   fixed;
+    z-index:    1000;
+    top:        0;
+    left:       0;
+    height:     100%;
+    width:      100%;
+    background: rgba( 255, 255, 255, .8 ) 
+                url(../images/FhHRx.gif) 
+                50% 50% 
+                no-repeat;
+}
+.no-print{ display: none; }
+body.loading {
+    overflow: hidden;
+}
+body.loading .modal {
+    display: block;
+}
+select[class^='ui-datepicker'],
+input[class^='ui-pg-input'],
+select[class^='ui-pg-selbox'] {
+    font: Arial,sans-serif;
+    margin: 0;
+    color: #333;
+}
+input[type='number']{
+	text-align:right;
+}
+/* NAVBAR */
+.navbar-default {
+    background-color: #C00;
+    border-color: #B00;
+}
+a.navbar-brand img {
+	max-height:35px;
+}
+.navbar-center{
+	position: absolute;
+	width: 100%;
+    left: 0;
+    text-align: center;
+    margin: auto;
+}
+.navbar-user {
+	padding:10px 0px;
+	color: #FFF;
+	text-transform: uppercase;
+}
+/*Panel flotante*/
+.panel-flotante {
+	position: fixed;
+	right:0px;
+	bottom:-145px;
+	width:320px;
+	max-height:400px;
+	z-index:0;
+}
+.panel-flotante a {color:#FFF;}
+/*SIDERBAR*/
+.red > li.active > a,
+.red > li.active > a:hover,
+.red > li.active > a:focus {
+    background-color: #C00;
+    color:#333;
+}
+.red > li > a,
+.red > li > a:hover,
+.red > li > a:focus {
+    background-color: #C00;
+    color:#DDD;
+}
+.red > li > a {
+    color: #FFF;
+}
+/*CONTENT*/
+.well.well-sm {
+    text-align: right;
+}
+.well.well-sm img{
+	float:left;
+}
+/*FORM*/
+.form-horizontal .control-label {Text-align:left;}
+.panel-default > .panel-heading {
+    background-color: #3c8dbc;
+    border-color: #008d4c;
+    color: #FFF;
+}
+form.form-horizontal{padding:4px 12px;}
+input:invalid, input:focus:invalid { 
+	background-image: url(../images/icons/glyphicons_196_circle_exclamation_mark.png);
+	background-position: right top;
+	background-repeat: no-repeat;
+	-moz-box-shadow: none;
+	background-color: #FEEFB3;
+    border-color: #C00;
+    color: #9F6000;
+}
+input:required:valid { 
+	background-image: url(../images/icons/glyphicons_193_circle_ok.png);
+	background-position: right top; 
+	background-repeat: no-repeat;
+} 
+div.bs-glyphicons a {
+    background-color: #f9f9f9;
+    border: 1px solid #c00;
+    float: left;
+    font-size: 10px;
+    height: 90px;
+    line-height: 1.4;
+    padding: 10px;
+    text-align: center;
+    width: 100%;
+}
+div.bs-glyphicons a:hover {
+    background-color: #c00;
+    color:#fff;
+}
+.activity-item span {
+	float: left;
+	margin-top: 3px;
+	font-size: 16px;
+}
+div.activity {margin-left: 28px;}
+div.activity-item {padding: 7px 12px;}
+#notification-list div.activity-item {border-top: 1px solid #f5f5f5;}
+#notification-list div.activity-item a {font-weight: 600;}
